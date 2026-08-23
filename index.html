@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拾光結帳 - 文青分帳本</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+    <!-- Load Tesseract.js for client-side OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'paper': '#F7F5F0',
+                        'ink': '#3B3A36',
+                        'wood': '#8C7A6B',
+                        'accent': '#A68A64',
+                        'matcha': '#8B9A76',
+                        'rose': '#B58B84',
+                    },
+                    fontFamily: {
+                        'serif': ['"Noto Serif TC"', 'serif'],
+                        'sans': ['"Noto Sans TC"', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'soft': '4px 4px 15px rgba(140, 122, 107, 0.15)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #F7F5F0;
+            color: #3B3A36;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+        }
+        .wood-border {
+            border: 1px solid #D5C7BC;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D5C7BC;
+            border-radius: 10px;
+        }
+        .loader {
+            border: 3px solid #F7F5F0;
+            border-top: 3px solid #8C7A6B;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="font-sans antialiased min-h-screen flex flex-col items-center py-10 px-4">
+
+    <header class="w-full max-w-3xl text-center mb-8">
+        <h1 class="font-serif text-4xl tracking-widest text-ink mb-2">拾光結帳</h1>
+        <p class="font-sans text-wood text-sm tracking-widest">極簡、精準、優雅的餐點分帳體驗</p>
+    </header>
+
+    <main class="w-full max-w-3xl bg-white shadow-soft rounded-2xl p-6 sm:p-10 wood-border">
+        
+        <!-- STEP 1: PEOPLE -->
+        <section id="step-people" class="mb-10">
+            <h2 class="font-serif text-xl border-b border-wood/30 pb-2 mb-4 flex items-center justify-between">
+                <span><span class="text-matcha mr-2">壹、</span> 赴宴者</span>
+                <span id="people-count" class="text-xs font-sans text-wood">共 0 人</span>
+            </h2>
+            <div class="flex flex-col gap-4">
+                <div class="flex gap-2">
+                    <input type="text" id="new-person-name" placeholder="輸入姓名或稱呼..." class="flex-1 bg-paper wood-border rounded-lg px-4 py-2 focus:outline-none focus:border-accent transition-colors font-sans">
+                    <button onclick="addPerson()" class="bg-wood text-white px-6 py-2 rounded-lg hover:bg-accent transition-colors tracking-widest">新增</button>
+                </div>
+                <div id="people-list" class="flex flex-wrap gap-2 mt-2">
+                    <!-- People tags will appear here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- STEP 2: RECEIPT LOAD / OCR -->
+        <section id="step-receipt" class="mb-10">
+            <h2 class="font-serif text-xl border-b border-wood/30 pb-2 mb-4 flex items-center">
+                <span class="text-matcha mr-2">貳、</span> 載入明細
+            </h2>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <div class="flex-1 border-2 border-dashed border-wood/40 rounded-xl p-6 text-center hover:bg-paper transition-colors relative cursor-pointer" onclick="document.getElementById('receipt-upload').click()">
+                    <input type="file" id="receipt-upload" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                    <div id="upload-content">
+                        <svg class="w-10 h-10 mx-auto text-wood mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <p class="text-wood font-medium">拍攝或上傳拍照收據</p>
+                        <p class="text-xs text-wood/70 mt-1">自動辨識餐點名稱與金額</p>
+                    </div>
+                    <div id="loading-ocr" class="hidden flex-col items-center justify-center absolute inset-0 bg-white/90 rounded-xl z-10">
+                        <div class="loader mb-2"></div>
+                        <p class="text-wood text-sm tracking-wider" id="ocr-status">辨識字跡中...</p>
+                    </div>
+                </div>
+                <div class="flex flex-col justify-center gap-2">
+                    <button onclick="loadScenarioData()" class="bg-matcha text-white px-4 py-2 rounded-lg hover:bg-matcha/80 transition-colors text-sm font-medium shadow-sm">
+                        ✨ 一鍵載入您提供的餐點與分攤情境
+                    </button>
+                    <button onclick="addManualItem()" class="border border-wood/50 text-wood px-4 py-2 rounded-lg hover:bg-paper transition-colors text-sm">
+                        + 手動新增單筆餐點
+                    </button>
+                </div>
+            </div>
+            
+            <div id="ocr-debug-container" class="mt-4 hidden">
+                <p class="text-xs text-wood/70 mb-1">辨識原始文字 (可幫助檢查除錯):</p>
+                <textarea id="ocr-debug-text" class="w-full h-20 p-2 text-xs bg-paper wood-border rounded-md text-ink/70" readonly></textarea>
+            </div>
+        </section>
+
+        <!-- STEP 3: ITEM ASSIGNMENT -->
+        <section id="step-items" class="mb-10">
+            <h2 class="font-serif text-xl border-b border-wood/30 pb-2 mb-4 flex items-center justify-between">
+                <div><span class="text-matcha mr-2">參、</span> 設定餐點與分攤對象</div>
+                <div class="text-sm font-sans text-wood">餐點小計: $<span id="items-subtotal">0</span></div>
+            </h2>
+            
+            <p class="text-xs text-wood/70 mb-4">點擊餐點旁的「選擇分攤者」，勾選個人獨立付費或選擇多位成員（如：2人/3人共同平分）。</p>
+
+            <div id="items-list" class="flex flex-col gap-3">
+                <div class="text-center text-wood/50 py-8 text-sm italic">尚無餐點資料，請選擇載入範例情境、上傳收據或手動新增。</div>
+            </div>
+
+            <!-- Global Settings (Tax/Service) -->
+            <div class="mt-6 p-4 bg-paper rounded-lg wood-border">
+                <div class="flex items-center justify-between mb-1">
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" id="service-fee-toggle" onchange="toggleServiceFeeInput()" class="w-4 h-4 accent-matcha cursor-pointer rounded border-wood/30">
+                        <label for="service-fee-toggle" class="text-ink font-medium text-sm cursor-pointer">收取服務費</label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="global-fee-percent" value="10" min="0" step="1" onchange="calculateSummary()" class="w-16 bg-white border border-wood/30 rounded px-2 py-1 text-right focus:outline-none focus:border-accent font-serif disabled:opacity-50 disabled:bg-paper transition-opacity" disabled>
+                        <span class="text-wood text-sm font-medium">%</span>
+                    </div>
+                </div>
+                <p class="text-xs text-wood/70 mt-2">打勾開啟後，系統會依照每個人所點餐點的「消費比例」去公平分攤服務費。</p>
+            </div>
+        </section>
+
+        <!-- STEP 4: SUMMARY BREAKDOWN -->
+        <section id="step-summary">
+            <h2 class="font-serif text-xl border-b border-wood/30 pb-2 mb-4 flex items-center justify-between">
+                <div><span class="text-matcha mr-2">肆、</span> 結算清單</div>
+                <div class="text-lg font-serif text-rose font-semibold">總計金額: $<span id="grand-total">0</span></div>
+            </h2>
+
+            <div id="summary-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="text-center text-wood/50 py-8 text-sm italic col-span-full">請先設定赴宴者與餐點分攤。</div>
+            </div>
+            
+            <div class="mt-8 flex justify-center">
+                <button onclick="copySummary()" class="bg-ink text-paper px-8 py-3 rounded-full hover:bg-wood transition-colors tracking-widest shadow-soft flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                    複製詳細分帳資訊 (Line/Message 適用)
+                </button>
+            </div>
+        </section>
+
+    </main>
+    
+    <footer class="mt-8 text-wood/60 text-xs text-center pb-8">
+        Designed for mindful splitting.
+    </footer>
+
+    <script>
+        // Data State
+        let people = [
+            { id: 'pA', name: 'A' },
+            { id: 'pB', name: 'B' },
+            { id: 'pC', name: 'C' },
+            { id: 'pD', name: 'D' },
+            { id: 'pE', name: 'E' }
+        ];
+
+        let items = [];
+        let nextItemId = 1;
+
+        // DOM Elements
+        const peopleListEl = document.getElementById('people-list');
+        const peopleCountEl = document.getElementById('people-count');
+        const itemsListEl = document.getElementById('items-list');
+        const summaryListEl = document.getElementById('summary-list');
+
+        function init() {
+            renderPeople();
+            loadScenarioData(); // Load user scenario by default
+        }
+
+        // --- People Management ---
+        function addPerson() {
+            const input = document.getElementById('new-person-name');
+            const name = input.value.trim();
+            if (name) {
+                const id = 'p_' + Date.now();
+                people.push({ id, name });
+                input.value = '';
+                renderPeople();
+                renderItems();
+                calculateSummary();
+            }
+        }
+
+        function removePerson(id) {
+            if(people.length <= 1) {
+                showNotification("至少需要保留一位赴宴者。");
+                return;
+            }
+            people = people.filter(p => p.id !== id);
+            
+            // Remove person from item assignments
+            items.forEach(item => {
+                item.assignees = item.assignees.filter(aId => aId !== id);
+            });
+            
+            renderPeople();
+            renderItems();
+            calculateSummary();
+        }
+
+        function renderPeople() {
+            peopleCountEl.textContent = `共 ${people.length} 人`;
+            peopleListEl.innerHTML = people.map(p => `
+                <div class="flex items-center bg-white border border-wood/20 rounded-full pl-3 pr-1 py-1 shadow-sm">
+                    <span class="text-sm font-medium mr-2 text-ink">${p.name}</span>
+                    <button onclick="removePerson('${p.id}')" class="text-wood/50 hover:text-rose hover:bg-rose/10 rounded-full w-5 h-5 flex items-center justify-center transition-colors pb-0.5">&times;</button>
+                </div>
+            `).join('');
+        }
+
+        // --- Item Management ---
+        function addManualItem() {
+            items.push({
+                id: 'i' + nextItemId++,
+                name: '新餐點',
+                price: 100,
+                qty: 1,
+                assignees: [] // empty or array of person IDs
+            });
+            renderItems();
+            calculateSummary();
+            
+            setTimeout(() => {
+                const inputs = itemsListEl.querySelectorAll('.item-name-input');
+                if(inputs.length > 0) {
+                    inputs[inputs.length - 1].focus();
+                    inputs[inputs.length - 1].select();
+                }
+            }, 50);
+        }
+
+        function removeItem(id) {
+            items = items.filter(item => item.id !== id);
+            renderItems();
+            calculateSummary();
+        }
+
+        function updateItem(id, field, value) {
+            const item = items.find(i => i.id === id);
+            if (item) {
+                if(field === 'price') {
+                    item.price = parseFloat(value) || 0;
+                } else if(field === 'qty') {
+                    item.qty = parseInt(value) || 1;
+                } else {
+                    item[field] = value;
+                }
+                calculateSummary();
+                updateSubtotalUI();
+            }
+        }
+
+        function toggleAssignee(itemId, personId) {
+            const item = items.find(i => i.id === itemId);
+            if (!item) return;
+
+            if (personId === 'ALL') {
+                // Toggle between all people assigned vs none
+                if (item.assignees.length === people.length) {
+                    item.assignees = [];
+                } else {
+                    item.assignees = people.map(p => p.id);
+                }
+            } else {
+                if (item.assignees.includes(personId)) {
+                    item.assignees = item.assignees.filter(id => id !== personId);
+                } else {
+                    item.assignees.push(personId);
+                }
+            }
+            renderItems();
+            calculateSummary();
+        }
+
+        function toggleDropdown(itemId) {
+            const menu = document.getElementById(`dropdown-${itemId}`);
+            if (menu) {
+                menu.classList.toggle('hidden');
+            }
+        }
+        
+        function toggleServiceFeeInput() {
+            const toggle = document.getElementById('service-fee-toggle');
+            const input = document.getElementById('global-fee-percent');
+            input.disabled = !toggle.checked;
+            calculateSummary();
+        }
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.dropdown-container')) {
+                document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        function renderItems() {
+            if (items.length === 0) {
+                itemsListEl.innerHTML = '<div class="text-center text-wood/50 py-8 text-sm italic">尚無餐點資料，請選擇載入範例情境、上傳收據或手動新增。</div>';
+                updateSubtotalUI();
+                return;
+            }
+
+            itemsListEl.innerHTML = items.map(item => {
+                const totalItemCost = item.price * (item.qty || 1);
+                
+                // Build assignee display badges
+                let assigneeBadges = '';
+                if (item.assignees.length === 0) {
+                    assigneeBadges = `<span class="text-xs bg-rose/10 text-rose px-2 py-1 rounded-md border border-rose/20">⚠️ 未設定成員</span>`;
+                } else if (item.assignees.length === people.length && people.length > 0) {
+                    assigneeBadges = `<span class="text-xs bg-matcha/20 text-matcha font-medium px-2 py-1 rounded-md border border-matcha/30">全桌平分 (${people.length}人)</span>`;
+                } else {
+                    assigneeBadges = item.assignees.map(id => {
+                        const p = people.find(person => person.id === id);
+                        return p ? `<span class="text-xs bg-accent/15 text-ink font-medium px-2 py-0.5 rounded-md border border-accent/30">${p.name}</span>` : '';
+                    }).join(' ');
+                    if(item.assignees.length > 1) {
+                        assigneeBadges += ` <span class="text-xs text-wood font-serif">(${item.assignees.length}人平分)</span>`;
+                    }
+                }
+
+                // Build multi-select options list
+                const isAllSelected = people.length > 0 && item.assignees.length === people.length;
+                const allOption = `
+                    <div onclick="toggleAssignee('${item.id}', 'ALL')" class="px-3 py-1.5 text-xs font-semibold cursor-pointer hover:bg-paper flex items-center justify-between border-b border-wood/10 text-matcha">
+                        <span>全桌全體成員均分</span>
+                        <span>${isAllSelected ? '✓' : ''}</span>
+                    </div>`;
+
+                const peopleOptions = people.map(p => {
+                    const isAssigned = item.assignees.includes(p.id);
+                    return `
+                        <div onclick="toggleAssignee('${item.id}', '${p.id}')" class="px-3 py-1.5 text-xs cursor-pointer hover:bg-paper flex items-center justify-between ${isAssigned ? 'text-accent font-medium bg-accent/5' : 'text-ink'}">
+                            <span>${p.name}</span>
+                            <span>${isAssigned ? '✓' : ''}</span>
+                        </div>`;
+                }).join('');
+
+                return `
+                <div class="bg-white p-3 sm:p-4 rounded-xl border border-wood/20 shadow-sm flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between group">
+                    
+                    <!-- Item Name & Price/Qty -->
+                    <div class="flex-1 flex flex-wrap gap-2 items-center w-full sm:w-auto">
+                        <input type="text" value="${item.name}" onchange="updateItem('${item.id}', 'name', this.value)" class="item-name-input flex-1 min-w-[120px] bg-transparent border-b border-wood/30 focus:border-accent focus:outline-none py-1 text-ink font-medium placeholder-wood/40">
+                        
+                        <div class="flex items-center gap-1 text-sm text-wood">
+                            <span>$</span>
+                            <input type="number" value="${item.price}" min="0" onchange="updateItem('${item.id}', 'price', this.value)" class="w-16 bg-transparent border-b border-wood/30 focus:border-accent focus:outline-none py-1 text-right text-ink font-serif text-base">
+                        </div>
+
+                        <div class="flex items-center gap-1 text-xs text-wood">
+                            <span>x</span>
+                            <input type="number" value="${item.qty || 1}" min="1" onchange="updateItem('${item.id}', 'qty', this.value)" class="w-10 bg-transparent border-b border-wood/30 focus:border-accent focus:outline-none py-1 text-center text-ink font-serif">
+                        </div>
+
+                        <div class="text-sm font-serif font-semibold text-ink min-w-[60px] text-right">
+                            $${totalItemCost}
+                        </div>
+                    </div>
+
+                    <!-- Assignee Selector Dropdown -->
+                    <div class="flex items-center justify-between w-full sm:w-auto gap-2 border-t sm:border-t-0 pt-2 sm:pt-0 border-wood/10">
+                        <div class="relative dropdown-container">
+                            <button onclick="toggleDropdown('${item.id}')" class="flex items-center gap-1.5 min-w-[120px] max-w-[240px] flex-wrap p-1.5 border border-dashed border-wood/40 rounded-lg hover:border-accent transition-colors bg-paper/50">
+                                <div class="flex flex-wrap gap-1 items-center">
+                                    ${assigneeBadges}
+                                </div>
+                                <svg class="w-3.5 h-3.5 text-wood ml-auto flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </button>
+
+                            <!-- Dropdown Menu -->
+                            <div id="dropdown-${item.id}" class="dropdown-menu hidden absolute right-0 top-full mt-1 w-48 bg-white border border-wood/20 shadow-lg rounded-lg overflow-y-auto max-h-56 z-20 py-1 custom-scrollbar">
+                                ${allOption}
+                                ${peopleOptions}
+                            </div>
+                        </div>
+
+                        <button onclick="removeItem('${item.id}')" class="text-wood/40 hover:text-rose p-1 transition-opacity" title="刪除餐點">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+            updateSubtotalUI();
+        }
+
+        function updateSubtotalUI() {
+            const subtotal = items.reduce((sum, item) => sum + (item.price * (item.qty || 1)), 0);
+            document.getElementById('items-subtotal').textContent = subtotal.toFixed(0);
+        }
+
+        // --- Split Calculation Logic ---
+        function calculateSummary() {
+            const summaryListEl = document.getElementById('summary-list');
+            const grandTotalEl = document.getElementById('grand-total');
+            const isServiceFeeEnabled = document.getElementById('service-fee-toggle').checked;
+            const serviceFeePercent = parseFloat(document.getElementById('global-fee-percent').value) || 0;
+
+            if (people.length === 0 || items.length === 0) {
+                summaryListEl.innerHTML = '<div class="text-center text-wood/50 py-8 text-sm italic col-span-full">尚無餐點或赴宴者資料。</div>';
+                grandTotalEl.textContent = '0';
+                return;
+            }
+
+            // Map to hold detailed personal breakdowns
+            let personBreakdowns = {};
+            people.forEach(p => {
+                personBreakdowns[p.id] = {
+                    name: p.name,
+                    items: [], // { name, itemPrice, splitCount, myShare }
+                    baseTotal: 0,
+                    feeShare: 0,
+                    grandTotal: 0
+                };
+            });
+
+            let itemsSubtotal = 0;
+
+            // 1. Calculate each person's item costs
+            items.forEach(item => {
+                const totalItemPrice = item.price * (item.qty || 1);
+                itemsSubtotal += totalItemPrice;
+
+                if (item.assignees.length > 0) {
+                    const splitCount = item.assignees.length;
+                    const perPersonShare = totalItemPrice / splitCount;
+
+                    item.assignees.forEach(pId => {
+                        if (personBreakdowns[pId]) {
+                            personBreakdowns[pId].items.push({
+                                name: item.name + (item.qty > 1 ? ` (x${item.qty})` : ''),
+                                totalItemPrice: totalItemPrice,
+                                splitCount: splitCount,
+                                myShare: perPersonShare
+                            });
+                            personBreakdowns[pId].baseTotal += perPersonShare;
+                        }
+                    });
+                }
+            });
+
+            // 2. Calculate service fee proportional distribution
+            const globalFee = isServiceFeeEnabled ? (itemsSubtotal * (serviceFeePercent / 100)) : 0;
+            const grandTotal = itemsSubtotal + globalFee;
+            grandTotalEl.textContent = grandTotal.toFixed(0);
+
+            // Total base cost assigned across all individuals
+            const totalAssignedBase = Object.values(personBreakdowns).reduce((sum, p) => sum + p.baseTotal, 0);
+
+            Object.values(personBreakdowns).forEach(p => {
+                if (totalAssignedBase > 0 && globalFee > 0) {
+                    // Distribute service fee proportionally to each person's consumed subtotal
+                    p.feeShare = globalFee * (p.baseTotal / totalAssignedBase);
+                } else {
+                    p.feeShare = 0;
+                }
+                p.grandTotal = p.baseTotal + p.feeShare;
+            });
+
+            // 3. Render Summary UI Card
+            summaryListEl.innerHTML = Object.values(personBreakdowns).map(p => {
+                const itemListHtml = p.items.length > 0 
+                    ? p.items.map(i => `
+                        <div class="flex justify-between items-center text-xs text-wood/90 py-0.5">
+                            <span class="truncate max-w-[170px]">
+                                ${i.name}
+                                ${i.splitCount > 1 ? `<span class="text-matcha font-serif ml-1">(${i.splitCount}人分)</span>` : ''}
+                            </span>
+                            <span class="font-serif">$${Math.round(i.myShare)}</span>
+                        </div>
+                    `).join('')
+                    : '<div class="text-xs text-wood/40 italic py-1">未選擇任何餐點</div>';
+
+                return `
+                <div class="bg-paper p-4 rounded-xl wood-border relative overflow-hidden flex flex-col justify-between shadow-sm">
+                    <div>
+                        <div class="flex justify-between items-baseline border-b border-wood/20 pb-2 mb-3">
+                            <h3 class="font-serif text-lg text-ink font-semibold flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-accent inline-block"></span>
+                                ${p.name}
+                            </h3>
+                            <div class="text-right">
+                                <span class="text-xs text-wood block">應付總額</span>
+                                <span class="font-serif text-2xl text-rose font-semibold">$${Math.round(p.grandTotal)}</span>
+                            </div>
+                        </div>
+
+                        <!-- Itemized list -->
+                        <div class="space-y-1 mb-3">
+                            ${itemListHtml}
+                        </div>
+                    </div>
+
+                    <!-- Additional Fee Calculation -->
+                    ${p.feeShare > 0 ? `
+                        <div class="border-t border-wood/15 pt-2 mt-2 text-xs text-wood/70 flex justify-between">
+                            <span>含分攤服務費/稅金:</span>
+                            <span class="font-serif">$${Math.round(p.feeShare)}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                `;
+            }).join('');
+        }
+
+        // --- Load User's Custom Scenario ---
+        function loadScenarioData() {
+            // People: A, B, C, D, E
+            people = [
+                { id: 'pA', name: 'A' },
+                { id: 'pB', name: 'B' },
+                { id: 'pC', name: 'C' },
+                { id: 'pD', name: 'D' },
+                { id: 'pE', name: 'E' }
+            ];
+
+            // Items according to prompt setup
+            items = [
+                { id: 'i1', name: '松露野菇燉飯', price: 320, qty: 1, assignees: ['pA'] },
+                { id: 'i2', name: '雞腿飯', price: 250, qty: 1, assignees: ['pB'] },
+                { id: 'i3', name: '青醬海鮮義大利麵', price: 350, qty: 1, assignees: ['pD'] },
+                { id: 'i4', name: '炒泡麵', price: 120, qty: 1, assignees: ['pE'] },
+                { id: 'i5', name: '紅醬義大利麵', price: 350, qty: 1, assignees: ['pC'] },
+                { id: 'i6', name: '酥炸洋蔥圈', price: 150, qty: 1, assignees: ['pA', 'pB', 'pC'] }, // 3人均分 (情境未指明哪3人，預設帶入A,B,C)
+                { id: 'i7', name: '提拉米蘇', price: 120, qty: 1, assignees: ['pD', 'pE'] },      // 2人均分 (預設帶入D,E)
+                { id: 'i8', name: '熱拿鐵', price: 130, qty: 1, assignees: ['pA'] },
+                { id: 'i9', name: '柳橙汁', price: 99, qty: 2, assignees: ['pB', 'pC'] },         // B與C各點1杯
+                { id: 'i10', name: '西瓜汁', price: 99, qty: 1, assignees: ['pD'] },
+                { id: 'i11', name: '蘋果汁', price: 100, qty: 1, assignees: ['pE'] },
+                { id: 'i12', name: '起司', price: 499, qty: 1, assignees: ['pA', 'pB', 'pC'] }    // 3人均分
+            ];
+            nextItemId = 13;
+            
+            document.getElementById('service-fee-toggle').checked = false;
+            document.getElementById('global-fee-percent').value = 10;
+            document.getElementById('global-fee-percent').disabled = true;
+
+            renderPeople();
+            renderItems();
+            calculateSummary();
+            showNotification("已成功載入您的特定餐點與分攤情境！");
+        }
+
+        // --- OCR & Receipt Parsing ---
+        async function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const loadingOverlay = document.getElementById('loading-ocr');
+            const debugContainer = document.getElementById('ocr-debug-container');
+            const debugText = document.getElementById('ocr-debug-text');
+            const statusText = document.getElementById('ocr-status');
+
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+            
+            try {
+                statusText.textContent = "準備影像...";
+                const imageUrl = URL.createObjectURL(file);
+                
+                statusText.textContent = "AI 辨識文字中 (需數秒)...";
+                const result = await Tesseract.recognize(
+                    imageUrl,
+                    'chi_tra+eng',
+                    { logger: m => {
+                        if(m.status === 'recognizing text') {
+                           statusText.textContent = `辨識進度: ${Math.round(m.progress * 100)}%`;
+                        }
+                    }}
+                );
+
+                const rawText = result.data.text;
+                
+                debugContainer.classList.remove('hidden');
+                debugText.value = rawText;
+
+                statusText.textContent = "解析餐點資料...";
+                parseReceiptText(rawText);
+
+            } catch (error) {
+                console.error(error);
+                showNotification("圖片辨識失敗，請上傳拍攝清晰的照片或手動輸入。");
+            } finally {
+                loadingOverlay.classList.add('hidden');
+                loadingOverlay.classList.remove('flex');
+                event.target.value = '';
+            }
+        }
+
+        function parseReceiptText(text) {
+            const lines = text.split('\n');
+            let addedCount = 0;
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line) return;
+
+                const cleanLine = line.replace(/,/g, '');
+                const match = cleanLine.match(/^(.*?)[$\s.\-:]+(\d+)(?:\.\d+)?\s*$/);
+
+                if (match) {
+                    let name = match[1].trim();
+                    const price = parseFloat(match[2]);
+
+                    const skipKeywords = ['總計', '合計', 'total', 'subtotal', '小計', '現金', '找零', '刷卡', 'cash', 'change', 'tax', '桌號', '人數'];
+                    const isSkip = skipKeywords.some(kw => name.toLowerCase().includes(kw));
+
+                    if (name.length > 0 && !isSkip && price > 0 && price < 100000 && !/^\d+$/.test(name)) {
+                        if(name.includes('服務費') || name.toLowerCase().includes('service')) {
+                            document.getElementById('service-fee-toggle').checked = true;
+                            document.getElementById('global-fee-percent').disabled = false;
+                            document.getElementById('global-fee-percent').value = 10; // Default to 10% when detected
+                        } else {
+                            items.push({
+                                id: 'i' + nextItemId++,
+                                name: name.substring(0, 20),
+                                price: price,
+                                qty: 1,
+                                assignees: people.map(p => p.id) // Default assign to all
+                            });
+                            addedCount++;
+                        }
+                    }
+                }
+            });
+
+            if (addedCount > 0) {
+                renderItems();
+                calculateSummary();
+                document.getElementById('step-items').scrollIntoView({ behavior: 'smooth' });
+                showNotification(`成功辨識新增 ${addedCount} 項餐點！`);
+            } else {
+                showNotification("未能從圖片中提取出明確餐點，已保留原始辨識結果。");
+            }
+        }
+
+        // --- Utilities ---
+        function showNotification(msg) {
+            const notif = document.createElement('div');
+            notif.className = 'fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-ink text-paper px-6 py-2.5 rounded-full shadow-lg transition-all duration-300 z-50 text-sm font-sans tracking-wider border border-wood/30';
+            notif.textContent = msg;
+            document.body.appendChild(notif);
+            
+            setTimeout(() => {
+                notif.style.opacity = '0';
+                setTimeout(() => notif.remove(), 300);
+            }, 2500);
+        }
+
+        function copySummary() {
+            if (people.length === 0 || items.length === 0) return;
+
+            const grandTotal = document.getElementById('grand-total').textContent;
+            
+            const isServiceFeeEnabled = document.getElementById('service-fee-toggle').checked;
+            const serviceFeePercent = parseFloat(document.getElementById('global-fee-percent').value) || 0;
+            let itemsSubtotal = items.reduce((sum, item) => sum + (item.price * (item.qty || 1)), 0);
+            const globalFee = isServiceFeeEnabled ? (itemsSubtotal * (serviceFeePercent / 100)) : 0;
+            
+            let text = `【 拾光結帳 - 分帳明細 】\n`;
+            text += `📅 總金額: $${grandTotal}${globalFee > 0 ? ` (含 ${serviceFeePercent}% 服務費 $${Math.round(globalFee)})` : ''}\n`;
+            text += `------------------------------\n`;
+
+            // Calculate individually for full accuracy
+            people.forEach(p => {
+                let pBase = 0;
+                let pItems = [];
+
+                items.forEach(item => {
+                    const totalItemPrice = item.price * (item.qty || 1);
+                    if (item.assignees.includes(p.id)) {
+                        const share = totalItemPrice / item.assignees.length;
+                        pBase += share;
+                        const splitTag = item.assignees.length > 1 ? ` (${item.assignees.length}人平分)` : '';
+                        pItems.push(`  • ${item.name}${splitTag}: $${Math.round(share)}`);
+                    }
+                });
+
+                let totalAssignedBase = 0;
+                items.forEach(i => {
+                    if (i.assignees.length > 0) totalAssignedBase += (i.price * (i.qty || 1));
+                });
+
+                let feeShare = (totalAssignedBase > 0 && globalFee > 0) ? (globalFee * (pBase / totalAssignedBase)) : 0;
+                let finalOwed = pBase + feeShare;
+
+                text += `👤 【${p.name}】 應付: $${Math.round(finalOwed)}\n`;
+                if(pItems.length > 0) {
+                    text += pItems.join('\n') + '\n';
+                }
+                if(feeShare > 0) {
+                    text += `  • 分攤稅費: $${Math.round(feeShare)}\n`;
+                }
+                text += `\n`;
+            });
+
+            text += `------------------------------\n*點擊連結開啟「拾光結帳 - 文青分帳本」`;
+
+            try {
+                navigator.clipboard.writeText(text).then(() => {
+                    showNotification("已成功複製詳細分帳資訊到剪貼簿！");
+                }).catch(() => {
+                    fallbackCopyTextToClipboard(text);
+                });
+            } catch (e) {
+                fallbackCopyTextToClipboard(text);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+             const textArea = document.createElement("textarea");
+             textArea.value = text;
+             textArea.style.top = "0";
+             textArea.style.left = "0";
+             textArea.style.position = "fixed";
+             document.body.appendChild(textArea);
+             textArea.focus();
+             textArea.select();
+             try {
+                document.execCommand('copy');
+                showNotification("已成功複製詳細分帳資訊到剪貼簿！");
+             } catch (err) {
+                 console.error('Fallback failed', err);
+             }
+             document.body.removeChild(textArea);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
