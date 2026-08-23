@@ -57,38 +57,52 @@
           <span class="text-matcha mr-2">貳、</span> 載入明細
         </h2>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div class="bg-paper border border-wood/30 rounded-xl p-4 flex flex-col shadow-sm">
-            <div class="flex items-center gap-2 mb-2 text-ink font-medium">
-              直接貼上文字
-              <span class="text-xs bg-matcha/20 text-matcha px-2 py-0.5 rounded-full">最快</span>
-            </div>
-            <p class="text-xs text-wood/80 mb-3">每項一行，支援繁中、英文、數量與價格欄位。</p>
-            <textarea
-              id="manual-text-input"
-              class="form-textarea flex-1 min-h-[120px]"
-              placeholder="例如：&#10;森林雞腿排 237&#10;Iced Latte $120&#10;紅茶 2 60 120"
-            ></textarea>
-            <button id="parse-text-button" type="button" class="primary-button w-full mt-3">自動解析明細</button>
-          </div>
-
+        <div class="receipt-entry-grid mb-4">
           <div class="upload-card" id="upload-card">
-            <input type="file" id="receipt-upload" accept="image/*" capture="environment" class="hidden" />
-            <button id="upload-button" type="button" class="w-full h-full flex flex-col items-center justify-center p-4">
-              <span class="upload-icon" aria-hidden="true">◎</span>
-              <span class="text-wood font-medium">拍攝或選擇收據</span>
-              <span class="text-xs text-wood/70 mt-1">PaddleOCR 繁中／英文瀏覽器辨識</span>
-              <span class="text-xs text-matcha mt-2">圖片只在這台裝置上處理</span>
-            </button>
+            <input type="file" id="receipt-camera" accept="image/*" capture="environment" class="visually-hidden" />
+            <input type="file" id="receipt-upload" accept="image/jpeg,image/png,image/webp,image/*" class="visually-hidden" />
+            <div class="upload-card-body">
+              <svg class="upload-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 9a2 2 0 0 1 2-2h1.1a2 2 0 0 0 1.66-.89l.48-.72A2 2 0 0 1 9.9 4.5h4.2a2 2 0 0 1 1.66.89l.48.72A2 2 0 0 0 17.9 7H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
+                <circle cx="12" cy="13" r="3.25" stroke-width="1.5" />
+              </svg>
+              <h3 class="font-serif text-lg text-ink tracking-wider">辨識收據</h3>
+              <p class="text-xs text-wood/75 mt-1">繁體中文與英文 · 圖片只在本機處理</p>
+              <div class="upload-actions">
+                <label for="receipt-camera" class="upload-action upload-action-primary">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 9a2 2 0 0 1 2-2h2l1.2-2h7.6L17 7h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3" stroke-width="1.8"/></svg>
+                  拍照
+                </label>
+                <label for="receipt-upload" class="upload-action">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6.5A2.5 2.5 0 0 1 6.5 4h3l2 2h6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-10Z"/></svg>
+                  選擇圖片
+                </label>
+              </div>
+              <p class="upload-hint">支援 JPG、PNG、WebP，單張上限 20 MB</p>
+            </div>
             <div id="loading-ocr" class="ocr-overlay hidden" role="status" aria-live="polite">
               <div class="loader mb-2"></div>
               <p id="ocr-status" class="text-wood text-sm tracking-wider font-medium">準備辨識...</p>
               <p id="ocr-sub-status" class="text-xs text-wood/60 mt-2"></p>
             </div>
           </div>
+
+          <div class="manual-entry-panel">
+            <div class="flex items-baseline justify-between gap-2 mb-2">
+              <h3 class="font-serif text-lg text-ink tracking-wider">直接貼上明細</h3>
+              <span class="text-xs text-matcha">最快</span>
+            </div>
+            <p class="text-xs text-wood/75 mb-3">每項一行，支援品名、數量、單價與金額。</p>
+            <textarea
+              id="manual-text-input"
+              class="form-textarea w-full manual-textarea"
+              placeholder="森林雞腿排 237&#10;Iced Latte $120&#10;紅茶 2 60 120"
+            ></textarea>
+            <button id="parse-text-button" type="button" class="primary-button w-full mt-3">解析文字明細</button>
+          </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row justify-between gap-2 border-t border-wood/20 pt-4">
+        <div class="receipt-toolbar">
           <label class="flex items-center gap-2 text-xs text-wood">
             OCR 模型
             <select id="ocr-model" class="bg-white wood-border rounded px-2 py-1">
@@ -97,7 +111,7 @@
             </select>
           </label>
           <div class="flex flex-wrap justify-end gap-2">
-            <button id="load-scenario-button" type="button" class="secondary-button bg-matcha text-white border-matcha">✨ 載入範例</button>
+            <button id="load-scenario-button" type="button" class="secondary-button secondary-button-filled">載入範例</button>
             <button id="add-item-button" type="button" class="secondary-button">+ 手動新增餐點</button>
           </div>
         </div>

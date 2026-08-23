@@ -55,7 +55,7 @@ function renderAssigneeSelector(item, people) {
   const isAllSelected = people.length > 0 && item.assignees.length === people.length;
   const selectedPeople = people.filter((person) => item.assignees.includes(person.id));
   const label = selectedPeople.length === 0
-    ? '⚠️ 未設定成員'
+    ? '尚未設定成員'
     : isAllSelected
       ? `全桌平分 (${people.length}人)`
       : selectedPeople.map((person) => escapeHtml(person.name)).join('、');

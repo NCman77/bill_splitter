@@ -30,7 +30,7 @@ export class BillSplitterApp {
     this.#elements.personForm.addEventListener('submit', (event) => this.#addPerson(event));
     this.#elements.peopleList.addEventListener('click', (event) => this.#handlePeopleClick(event));
     this.#elements.parseTextButton.addEventListener('click', () => this.#parseManualText());
-    this.#elements.uploadButton.addEventListener('click', () => this.#elements.receiptUpload.click());
+    this.#elements.receiptCamera.addEventListener('change', (event) => this.#handleImageUpload(event));
     this.#elements.receiptUpload.addEventListener('change', (event) => this.#handleImageUpload(event));
     this.#elements.reparseOcrButton.addEventListener('click', () => this.#reparseOcrText());
     this.#elements.addItemButton.addEventListener('click', () => this.#addManualItem());
@@ -136,11 +136,12 @@ export class BillSplitterApp {
   }
 
   #showOcrError(error) {
+    const message = getOcrErrorMessage(error);
     this.#elements.ocrDebugContainer.classList.remove('hidden');
     this.#elements.ocrDebugText.value = '';
     this.#elements.ocrConfidence.textContent = '辨識失敗';
-    this.#elements.ocrWarnings.textContent = error instanceof Error ? error.message : String(error);
-    showNotification('PaddleOCR 無法完成辨識，請檢查網路後重試。');
+    this.#elements.ocrWarnings.textContent = message;
+    showNotification(message);
   }
 
   #reparseOcrText() {
@@ -214,7 +215,9 @@ export class BillSplitterApp {
 
   #setOcrLoading(isLoading, status = '', detail = '') {
     this.#elements.ocrOverlay.classList.toggle('hidden', !isLoading);
-    this.#elements.uploadButton.disabled = isLoading;
+    this.#elements.uploadCard.classList.toggle('is-loading', isLoading);
+    this.#elements.receiptCamera.disabled = isLoading;
+    this.#elements.receiptUpload.disabled = isLoading;
     this.#elements.ocrModel.disabled = isLoading;
     if (status) this.#setOcrStatus(status, detail);
   }
@@ -230,7 +233,8 @@ function getRequiredElements() {
     personForm: 'person-form', personName: 'new-person-name',
     peopleCount: 'people-count', peopleList: 'people-list',
     manualText: 'manual-text-input', parseTextButton: 'parse-text-button',
-    uploadButton: 'upload-button', receiptUpload: 'receipt-upload', ocrModel: 'ocr-model',
+    uploadCard: 'upload-card', receiptCamera: 'receipt-camera',
+    receiptUpload: 'receipt-upload', ocrModel: 'ocr-model',
     ocrOverlay: 'loading-ocr', ocrStatus: 'ocr-status', ocrSubStatus: 'ocr-sub-status',
     ocrDebugContainer: 'ocr-debug-container', ocrDebugText: 'ocr-debug-text',
     ocrConfidence: 'ocr-confidence', ocrWarnings: 'ocr-warnings',
@@ -241,6 +245,15 @@ function getRequiredElements() {
     grandTotal: 'grand-total', copySummaryButton: 'copy-summary-button',
   };
   return Object.fromEntries(Object.entries(elementIds).map(([name, id]) => [name, requireElement(id)]));
+}
+
+function getOcrErrorMessage(error) {
+  const detail = error instanceof Error ? error.message : String(error);
+  if (/decode|image|bitmap|format/i.test(detail)) {
+    return '無法讀取這張圖片，請改用 JPG、PNG 或 WebP 後重試。';
+  }
+  if (!navigator.onLine) return '目前沒有網路，首次使用需連線下載 OCR 模型。';
+  return `OCR 辨識失敗：${detail}`;
 }
 
 function requireElement(id) {

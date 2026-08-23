@@ -3,9 +3,9 @@ const TARGET_WIDTH = 2_200;
 const BORDER_SIZE = 24;
 
 export async function preprocessReceiptImage(file) {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const image = await decodeImage(file);
   try {
-    const { width, height, scale } = calculateOutputSize(bitmap.width, bitmap.height);
+    const { width, height, scale } = calculateOutputSize(image.width, image.height);
     const canvas = document.createElement('canvas');
     canvas.width = width + BORDER_SIZE * 2;
     canvas.height = height + BORDER_SIZE * 2;
@@ -15,22 +15,63 @@ export async function preprocessReceiptImage(file) {
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = 'high';
-    context.drawImage(bitmap, BORDER_SIZE, BORDER_SIZE, width, height);
+    context.drawImage(image.source, BORDER_SIZE, BORDER_SIZE, width, height);
     normalizeReceiptContrast(context, width, height);
 
     return {
       canvas,
       metadata: {
-        sourceWidth: bitmap.width,
-        sourceHeight: bitmap.height,
+        sourceWidth: image.width,
+        sourceHeight: image.height,
         outputWidth: canvas.width,
         outputHeight: canvas.height,
         scale,
       },
     };
   } finally {
-    bitmap.close();
+    image.release();
   }
+}
+
+async function decodeImage(file) {
+  if ('createImageBitmap' in globalThis) {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        release: () => bitmap.close(),
+      };
+    } catch {
+      // Safari and some mobile formats require the native image decoder fallback.
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const element = new Image();
+    element.decoding = 'async';
+    element.src = objectUrl;
+    await waitForImage(element);
+    return {
+      source: element,
+      width: element.naturalWidth,
+      height: element.naturalHeight,
+      release: () => URL.revokeObjectURL(objectUrl),
+    };
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw new Error('The selected image format could not be decoded.', { cause: error });
+  }
+}
+
+function waitForImage(image) {
+  if (typeof image.decode === 'function') return image.decode();
+  return new Promise((resolve, reject) => {
+    image.onload = resolve;
+    image.onerror = () => reject(new Error('Image decoding failed.'));
+  });
 }
 
 function calculateOutputSize(sourceWidth, sourceHeight) {
