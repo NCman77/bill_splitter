@@ -63,9 +63,8 @@ export function extractReceiptFromLines(lines) {
       }
       receipt.items.push({
         name: parsed.name,
-        price: roundMoney(parsed.price),
         quantity: parsed.quantity,
-        amount: roundMoney(parsed.price * parsed.quantity),
+        amount: roundMoney(parsed.amount),
         confidence: normalizeConfidence(line.score),
         bbox: line.poly,
       });
@@ -91,22 +90,32 @@ function matchReceiptValues(line) {
 }
 
 function matchPriceTimesQuantity(line) {
-  const match = line.match(/^(.+?)\s+\$?(\d+(?:\.\d+)?)\s*[xX*×]\s*(\d+)\s*$/);
+  const match = line.match(/^(.+?)\s+\$?(\d+(?:\.\d+)?)\s*[xX*×]\s*\$?(\d+(?:\.\d+)?)(?:\s*(?:=\s*)?\$?(\d+(?:\.\d+)?))?\s*$/);
   if (!match) return undefined;
 
   const firstNumber = Number(match[2]);
   const secondNumber = Number(match[3]);
-  if (firstNumber <= 50 && secondNumber > firstNumber) {
-    return { name: match[1], price: secondNumber, quantity: firstNumber };
+  const explicitAmount = match[4] ? Number(match[4]) : undefined;
+  if (Number.isInteger(firstNumber) && firstNumber <= 99 && secondNumber > firstNumber) {
+    return {
+      name: match[1],
+      quantity: firstNumber,
+      amount: explicitAmount ?? firstNumber * secondNumber,
+    };
   }
-  return { name: match[1], price: firstNumber, quantity: secondNumber };
+  if (!Number.isInteger(secondNumber) || secondNumber < 1 || secondNumber > 99) return undefined;
+  return {
+    name: match[1],
+    quantity: secondNumber,
+    amount: explicitAmount ?? firstNumber * secondNumber,
+  };
 }
 
 function matchLeadingQuantity(line) {
   const match = line.match(/^(\d{1,2})\s*[xX*×]\s*(.+?)\s+\$?(\d+(?:\.\d+)?)\s*$/);
   if (!match) return undefined;
   const quantity = Number(match[1]);
-  return { name: match[2], price: Number(match[3]) / quantity, quantity };
+  return { name: match[2], amount: Number(match[3]), quantity };
 }
 
 function matchQuantityAndUnitPrice(line) {
@@ -114,7 +123,7 @@ function matchQuantityAndUnitPrice(line) {
   if (!match) return undefined;
   const quantity = Number(match[2]);
   const lineAmount = match[4] ? Number(match[4]) : Number(match[3]) * quantity;
-  return { name: match[1], price: lineAmount / quantity, quantity };
+  return { name: match[1], amount: lineAmount, quantity };
 }
 
 function matchTrailingColumns(line) {
@@ -128,13 +137,13 @@ function matchTrailingColumns(line) {
     && values[0] >= 1
     && values[0] <= 50;
   const quantity = hasQuantityColumn ? values[0] : 1;
-  return { name: match[1], price: lineAmount / quantity, quantity };
+  return { name: match[1], amount: lineAmount, quantity };
 }
 
 function matchGluedPrice(line) {
   const match = line.match(/^(.+?[A-Za-z\u3400-\u9fff])\s*\$?(\d{2,6}(?:\.\d+)?)\s*$/);
   if (!match) return undefined;
-  return { name: match[1], price: Number(match[2]), quantity: 1 };
+  return { name: match[1], amount: Number(match[2]), quantity: 1 };
 }
 
 function cleanItemName(name) {
@@ -145,7 +154,7 @@ function cleanItemName(name) {
     .trim();
 }
 
-function isValidItem({ name, price, quantity }) {
+function isValidItem({ name, amount, quantity }) {
   const compactName = name.replace(/\s/g, '');
   const validCharacterCount = (compactName.match(VALID_NAME_CHARACTERS) ?? []).length;
   const readableRatio = compactName.length ? validCharacterCount / compactName.length : 0;
@@ -153,9 +162,9 @@ function isValidItem({ name, price, quantity }) {
   return Boolean(name)
     && validCharacterCount > 0
     && readableRatio >= 0.6
-    && Number.isFinite(price)
-    && price > 0
-    && price < 100_000
+    && Number.isFinite(amount)
+    && amount > 0
+    && amount < 100_000
     && Number.isInteger(quantity)
     && quantity >= 1
     && quantity <= 99;

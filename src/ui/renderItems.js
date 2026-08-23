@@ -3,7 +3,7 @@ import { escapeHtml, formatMoney } from '../utils/format.js';
 const EMPTY_ITEMS_MESSAGE = '尚無餐點資料，請貼上文字、上傳收據或手動新增。';
 
 export function renderItems(elements, state) {
-  const subtotal = state.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = state.items.reduce((sum, item) => sum + item.amount, 0);
   elements.itemsSubtotal.textContent = formatMoney(subtotal);
 
   if (state.items.length === 0) {
@@ -17,7 +17,6 @@ export function renderItems(elements, state) {
 }
 
 function renderItem(item, people) {
-  const total = item.price * item.quantity;
   return `
     <article class="bg-white p-3 sm:p-4 rounded-xl border ${item.needsReview ? 'border-rose/50' : 'border-wood/20'} shadow-sm flex flex-col gap-3">
       <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -31,15 +30,14 @@ function renderItem(item, people) {
             class="item-name-input flex-1 min-w-[130px] bg-transparent border-b border-wood/30 focus:border-accent focus:outline-none py-1 text-ink font-medium"
             aria-label="餐點品名"
           />
-          <label class="flex items-center gap-1 text-sm text-wood">
-            <span>$</span>
-            <input type="number" value="${item.price}" min="0" step="0.01" data-action="update-item" data-field="price" data-item-id="${item.id}" class="w-20 bg-transparent border-b border-wood/30 py-1 text-right text-ink font-serif" aria-label="單價" />
-          </label>
           <label class="flex items-center gap-1 text-xs text-wood">
             <span>x</span>
             <input type="number" value="${item.quantity}" min="1" data-action="update-item" data-field="quantity" data-item-id="${item.id}" class="w-12 bg-transparent border-b border-wood/30 py-1 text-center text-ink font-serif" aria-label="數量" />
           </label>
-          <strong class="text-sm font-serif text-ink min-w-[70px] text-right">$${formatMoney(total)}</strong>
+          <label class="flex items-center gap-1 text-sm text-wood">
+            <span>$</span>
+            <input type="number" value="${item.amount}" min="0" step="0.01" data-action="update-item" data-field="amount" data-item-id="${item.id}" class="w-24 bg-transparent border-b border-wood/30 py-1 text-right text-ink font-serif" aria-label="此餐點總金額" />
+          </label>
         </div>
         <div class="flex items-center justify-between w-full sm:w-auto gap-2">
           ${renderAssigneeSelector(item, people)}

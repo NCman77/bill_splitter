@@ -6,8 +6,8 @@ describe('bill calculation', () => {
     const state = {
       people: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }],
       items: [
-        { name: '主餐', price: 200, quantity: 1, assignees: ['a'] },
-        { name: '甜點', price: 100, quantity: 1, assignees: ['a', 'b'] },
+        { name: '主餐', amount: 200, quantity: 2, assignees: ['a'] },
+        { name: '甜點', amount: 100, quantity: 1, assignees: ['a', 'b'] },
       ],
       serviceFee: { enabled: true, percent: 10 },
     };
@@ -21,7 +21,7 @@ describe('bill calculation', () => {
   it('reports unassigned items without charging them to a person', () => {
     const state = {
       people: [{ id: 'a', name: 'A' }],
-      items: [{ name: '未分配', price: 90, quantity: 1, assignees: [] }],
+      items: [{ name: '未分配', amount: 90, quantity: 2, assignees: [] }],
       serviceFee: { enabled: false, percent: 10 },
     };
 

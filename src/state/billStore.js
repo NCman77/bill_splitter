@@ -41,7 +41,7 @@ export function createBillStore() {
     addManualItem() {
       update((current) => ({
         ...current,
-        items: [...current.items, createItem({ name: '新餐點', price: 100, quantity: 1 })],
+        items: [...current.items, createItem({ name: '新餐點', amount: 100, quantity: 1 })],
       }));
     },
     addReceipt(receipt, { replaceBatchId } = {}) {
@@ -109,7 +109,7 @@ function createInitialState() {
 
 function createItem({
   name,
-  price,
+  amount,
   quantity = 1,
   assignees = [],
   confidence = 1,
@@ -120,7 +120,7 @@ function createItem({
   return {
     id: createId('item'),
     name,
-    price: Number(price) || 0,
+    amount: Number(amount) || 0,
     quantity: Math.max(1, Number.parseInt(quantity, 10) || 1),
     assignees: [...assignees],
     confidence,
@@ -131,7 +131,7 @@ function createItem({
 }
 
 function updateItemField(item, field, rawValue) {
-  if (field === 'price') return { ...item, price: Math.max(0, Number(rawValue) || 0) };
+  if (field === 'amount') return { ...item, amount: Math.max(0, Number(rawValue) || 0) };
   if (field === 'quantity') {
     return { ...item, quantity: Math.max(1, Number.parseInt(rawValue, 10) || 1) };
   }
@@ -156,10 +156,10 @@ function createScenarioState() {
     ['青醬海鮮義大利麵', 350, 1, [3]], ['炒泡麵', 120, 1, [4]],
     ['紅醬義大利麵', 350, 1, [2]], ['酥炸洋蔥圈', 150, 1, [0, 1, 2]],
     ['提拉米蘇', 120, 1, [3, 4]], ['熱拿鐵', 130, 1, [0]],
-    ['柳橙汁', 99, 2, [1, 2]], ['西瓜汁', 99, 1, [3]],
-  ].map(([name, price, quantity, indices]) => createItem({
+    ['柳橙汁', 198, 2, [1, 2]], ['西瓜汁', 99, 1, [3]],
+  ].map(([name, amount, quantity, indices]) => createItem({
     name,
-    price,
+    amount,
     quantity,
     assignees: indices.map(personId),
   }));

@@ -1,5 +1,5 @@
 export function calculateBill(state) {
-  const subtotal = state.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = state.items.reduce((sum, item) => sum + item.amount, 0);
   const serviceFee = state.serviceFee.enabled
     ? subtotal * (state.serviceFee.percent / 100)
     : 0;
@@ -8,7 +8,7 @@ export function calculateBill(state) {
 
   let assignedSubtotal = 0;
   for (const item of state.items) {
-    const itemTotal = item.price * item.quantity;
+    const itemTotal = item.amount;
     if (item.assignees.length === 0) continue;
     assignedSubtotal += itemTotal;
     assignItemToPeople(item, itemTotal, breakdowns);

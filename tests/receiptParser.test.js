@@ -15,10 +15,22 @@ describe('receipt parser', () => {
 
     expect(receipt.hasServiceFee).toBe(true);
     expect(receipt.items).toMatchObject([
-      { name: '森林雞腿排', price: 237, quantity: 1, amount: 237 },
-      { name: 'Iced Latte', price: 120, quantity: 1, amount: 120 },
-      { name: '薯條', price: 80, quantity: 2, amount: 160 },
-      { name: '紅茶', price: 60, quantity: 2, amount: 120 },
+      { name: '森林雞腿排', quantity: 1, amount: 237 },
+      { name: 'Iced Latte', quantity: 1, amount: 120 },
+      { name: '薯條', quantity: 2, amount: 160 },
+      { name: '紅茶', quantity: 2, amount: 120 },
+    ]);
+  });
+
+  it('treats the last column as the total amount for the whole line', () => {
+    const receipt = extractReceiptFromText([
+      '森林雞排 2 399',
+      '雞腿排 149.5 *2 $299',
+    ].join('\n'));
+
+    expect(receipt.items).toMatchObject([
+      { name: '森林雞排', quantity: 2, amount: 399 },
+      { name: '雞腿排', quantity: 2, amount: 299 },
     ]);
   });
 
