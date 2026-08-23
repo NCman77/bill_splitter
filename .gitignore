@@ -1,0 +1,12 @@
+node_modules/
+dist/
+site-dist/
+/ACTIVE_SKILLS_INDEX.md
+.env
+.env.*
+!.env.example
+coverage/
+output/
+*.log
+.DS_Store
+Thumbs.db

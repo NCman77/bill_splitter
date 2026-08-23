@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="在瀏覽器內辨識繁體中文與英文收據，快速完成餐點分帳。"
+    />
+    <title>拾光結帳 - 文青分帳本</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              paper: '#F7F5F0', ink: '#3B3A36', wood: '#8C7A6B',
+              accent: '#A68A64', matcha: '#8B9A76', rose: '#B58B84',
+            },
+            fontFamily: {
+              serif: ['"Noto Serif TC"', 'serif'],
+              sans: ['"Noto Sans TC"', 'sans-serif'],
+            },
+            boxShadow: { soft: '4px 4px 15px rgba(140, 122, 107, 0.15)' },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;600&family=Noto+Sans+TC:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="font-sans antialiased min-h-screen flex flex-col items-center py-10 px-4">
+    <header class="w-full max-w-3xl text-center mb-8">
+      <h1 class="font-serif text-4xl tracking-widest text-ink mb-2">拾光結帳</h1>
+      <p class="font-sans text-wood text-sm tracking-widest">極簡、精準、優雅的餐點分帳體驗</p>
+    </header>
+
+    <main class="w-full max-w-3xl bg-white shadow-soft rounded-2xl p-6 sm:p-10 wood-border">
+      <section class="mb-10" aria-labelledby="people-heading">
+        <h2 id="people-heading" class="section-heading">
+          <span><span class="text-matcha mr-2">壹、</span> 赴宴者</span>
+          <span id="people-count" class="text-xs font-sans text-wood">共 0 人</span>
+        </h2>
+        <form id="person-form" class="flex gap-2" autocomplete="off">
+          <input id="new-person-name" type="text" placeholder="輸入姓名或稱呼..." class="form-input flex-1" />
+          <button class="primary-button" type="submit">新增</button>
+        </form>
+        <div id="people-list" class="flex flex-wrap gap-2 mt-4"></div>
+      </section>
+
+      <section class="mb-10" aria-labelledby="receipt-heading">
+        <h2 id="receipt-heading" class="section-heading justify-start">
+          <span class="text-matcha mr-2">貳、</span> 載入明細
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="bg-paper border border-wood/30 rounded-xl p-4 flex flex-col shadow-sm">
+            <div class="flex items-center gap-2 mb-2 text-ink font-medium">
+              直接貼上文字
+              <span class="text-xs bg-matcha/20 text-matcha px-2 py-0.5 rounded-full">最快</span>
+            </div>
+            <p class="text-xs text-wood/80 mb-3">每項一行，支援繁中、英文、數量與價格欄位。</p>
+            <textarea
+              id="manual-text-input"
+              class="form-textarea flex-1 min-h-[120px]"
+              placeholder="例如：&#10;森林雞腿排 237&#10;Iced Latte $120&#10;紅茶 2 60 120"
+            ></textarea>
+            <button id="parse-text-button" type="button" class="primary-button w-full mt-3">自動解析明細</button>
+          </div>
+
+          <div class="upload-card" id="upload-card">
+            <input type="file" id="receipt-upload" accept="image/*" capture="environment" class="hidden" />
+            <button id="upload-button" type="button" class="w-full h-full flex flex-col items-center justify-center p-4">
+              <span class="upload-icon" aria-hidden="true">◎</span>
+              <span class="text-wood font-medium">拍攝或選擇收據</span>
+              <span class="text-xs text-wood/70 mt-1">PaddleOCR 繁中／英文瀏覽器辨識</span>
+              <span class="text-xs text-matcha mt-2">圖片只在這台裝置上處理</span>
+            </button>
+            <div id="loading-ocr" class="ocr-overlay hidden" role="status" aria-live="polite">
+              <div class="loader mb-2"></div>
+              <p id="ocr-status" class="text-wood text-sm tracking-wider font-medium">準備辨識...</p>
+              <p id="ocr-sub-status" class="text-xs text-wood/60 mt-2"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-between gap-2 border-t border-wood/20 pt-4">
+          <label class="flex items-center gap-2 text-xs text-wood">
+            OCR 模型
+            <select id="ocr-model" class="bg-white wood-border rounded px-2 py-1">
+              <option value="PP-OCRv5">繁中優先（PP-OCRv5）</option>
+              <option value="PP-OCRv6">速度優先（PP-OCRv6）</option>
+            </select>
+          </label>
+          <div class="flex flex-wrap justify-end gap-2">
+            <button id="load-scenario-button" type="button" class="secondary-button bg-matcha text-white border-matcha">✨ 載入範例</button>
+            <button id="add-item-button" type="button" class="secondary-button">+ 手動新增餐點</button>
+          </div>
+        </div>
+
+        <div id="ocr-debug-container" class="mt-4 hidden">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs text-wood/70">OCR 原始文字（低信心欄位可先修正）</span>
+            <span id="ocr-confidence" class="confidence-badge"></span>
+          </div>
+          <textarea id="ocr-debug-text" class="form-textarea w-full h-32"></textarea>
+          <div id="ocr-warnings" class="text-xs text-rose mt-2" aria-live="polite"></div>
+          <button id="reparse-ocr-button" type="button" class="secondary-button mt-2">套用修正後的文字</button>
+        </div>
+      </section>
+
+      <section class="mb-10" aria-labelledby="items-heading">
+        <h2 id="items-heading" class="section-heading">
+          <span><span class="text-matcha mr-2">參、</span> 設定餐點與分攤對象</span>
+          <span class="text-sm font-sans text-wood">餐點小計: $<span id="items-subtotal">0</span></span>
+        </h2>
+        <p class="text-xs text-wood/70 mb-4">可選擇單一成員或多人共同平分；OCR 低信心餐點會顯示提醒。</p>
+        <div id="items-list" class="flex flex-col gap-3"></div>
+
+        <div class="mt-6 p-4 bg-paper rounded-lg wood-border">
+          <div class="flex items-center justify-between">
+            <label class="flex items-center gap-2 text-ink font-medium text-sm cursor-pointer">
+              <input type="checkbox" id="service-fee-toggle" class="w-4 h-4 accent-matcha" />
+              收取服務費
+            </label>
+            <div class="flex items-center gap-2">
+              <input type="number" id="global-fee-percent" value="10" min="0" step="1" class="number-input w-16" disabled />
+              <span class="text-wood text-sm font-medium">%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="summary-heading">
+        <h2 id="summary-heading" class="section-heading">
+          <span><span class="text-matcha mr-2">肆、</span> 結算清單</span>
+          <span class="text-lg font-serif text-rose font-semibold">總計金額: $<span id="grand-total">0</span></span>
+        </h2>
+        <div id="summary-warning" class="hidden mb-4 text-xs text-rose bg-rose/10 rounded-lg p-3"></div>
+        <div id="summary-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        <div class="mt-8 flex justify-center">
+          <button id="copy-summary-button" type="button" class="bg-ink text-paper px-8 py-3 rounded-full hover:bg-wood transition-colors tracking-widest shadow-soft">
+            複製詳細分帳資訊
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="mt-8 text-wood/60 text-xs text-center pb-8">
+      Designed for mindful splitting. · OCR runs locally in your browser.
+    </footer>
+    <div id="notification-region" aria-live="polite"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
